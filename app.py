@@ -55,6 +55,7 @@ def _generar_explicacion_simple(texto_tecnico: str):
     4. ANTI-REPETICIÓN: ESTÁ PROHIBIDO EMPEZAR SIEMPRE CON LA PALABRA "MIRA". 
        - Varía tus inicios: "La cosa está así...", "Si fuera mi dinero...", "Te cuento...", "Ojo con esto...".
        - Sorpréndeme con la variedad.
+       - Redactalo bien en Español de España
 
     GUÍA DE CONSEJOS (TRANSMITE ESTAS IDEAS CON TUS PROPIAS PALABRAS):
 
