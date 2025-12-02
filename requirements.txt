@@ -1,7 +1,13 @@
 streamlit
 pandas
-alpha_vantage
-pandas_ta
-scipy
-requests
 numpy
+requests
+openai
+joblib
+xgboost
+scikit-learn
+shap
+python-dotenv
+pandas_ta
+alpha_vantage
+scipy
