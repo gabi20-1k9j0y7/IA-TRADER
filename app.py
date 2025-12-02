@@ -52,6 +52,9 @@ def _generar_explicacion_simple(texto_tecnico: str):
     1. CERO NÚMEROS: Prohibido mencionar precios, porcentajes o fechas exactas.
     2. CERO TECNICISMOS: Nada de "momentum", "señal", "volatilidad".
     3. LENGUAJE: Natural, cercano pero bien escrito
+    4. ANTI-REPETICIÓN: ESTÁ PROHIBIDO EMPEZAR SIEMPRE CON LA PALABRA "MIRA". 
+       - Varía tus inicios: "La cosa está así...", "Si fuera mi dinero...", "Te cuento...", "Ojo con esto...".
+       - Sorpréndeme con la variedad.
 
     GUÍA DE CONSEJOS (TRANSMITE ESTAS IDEAS CON TUS PROPIAS PALABRAS):
 
