@@ -1,0 +1,7 @@
+streamlit
+pandas
+alpha_vantage
+pandas_ta
+scipy
+requests
+numpy

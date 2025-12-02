@@ -1,0 +1,123 @@
+
+=== Datasets cargados ===
+✓ 252d n=1001 d=21
+✓ 504d n=749 d=18
+
+=== 252d: TOP-5 por skill ===
+         model  half_life  freq_thr  topk      RMSE  RMSE_std       MAE   MAE_std        R2    R2_std  Baseline     Skill%
+27       lasso        378       0.4     8  0.249170  0.114776  0.219490  0.106276 -1.514495  0.832837  0.396321  37.129348
+28       lasso        378       0.4    12  0.249170  0.114776  0.219490  0.106276 -1.514495  0.832837  0.396321  37.129348
+29       lasso        378       0.4    18  0.249170  0.114776  0.219490  0.106276 -1.514495  0.832837  0.396321  37.129348
+63  elasticnet        378       0.4     8  0.249544  0.116440  0.220248  0.106911 -1.514022  0.907915  0.396321  37.034965
+64  elasticnet        378       0.4    12  0.249544  0.116440  0.220248  0.106911 -1.514022  0.907915  0.396321  37.034965
+
+=== Mejor config 252d ===
+{'model': 'lasso', 'half_life': 378, 'freq_thr': 0.4, 'topk': 8, 'RMSE': 0.24916975646841602, 'RMSE_std': 0.11477627603850649, 'MAE': 0.2194896310061724, 'MAE_std': 0.106275981446332, 'R2': -1.5144949357281194, 'R2_std': 0.8328372012242612, 'Baseline': 0.39632125468537277, 'Skill%': 37.12934809256592}
+
+=== 252d: Features usadas en el modelo final (18) ===
+0                  close
+1                 volume
+2                 roc_21
+3               roc_1260
+4            dist_sma400
+5          from_52w_high
+6               from_ath
+7          drawdown_long
+8               trend_ok
+9         trend_slope_3y
+10      vol_ratio_21_252
+11    vol_ratio_252_1260
+12         hv_yz_270_ext
+13        iv_atm_360_ext
+14    iv_ts_ratio_30_360
+15         iv_minus_hv30
+16         news_mean_w63
+17          news_std_w63
+
+=== 252d: Coeficientes finales — TOP 12 ===
+                        coef
+dist_sma400         0.458900
+trend_slope_3y      0.146877
+close               0.136874
+roc_1260            0.053517
+hv_yz_270_ext       0.035915
+vol_ratio_252_1260  0.020238
+iv_minus_hv30       0.013852
+news_mean_w63       0.013743
+vol_ratio_21_252    0.000000
+volume             -0.002790
+roc_21             -0.002949
+news_std_w63       -0.007704
+
+=== 252d: Coeficientes finales — BOTTOM 12 ===
+                        coef
+iv_minus_hv30       0.013852
+news_mean_w63       0.013743
+vol_ratio_21_252    0.000000
+volume             -0.002790
+roc_21             -0.002949
+news_std_w63       -0.007704
+trend_ok           -0.009632
+iv_ts_ratio_30_360 -0.019312
+iv_atm_360_ext     -0.073680
+from_52w_high      -0.074217
+drawdown_long      -0.267581
+from_ath           -0.682788
+
+=== Resumen 252d ===
+252d → RMSE=0.2492 (base 0.3963) | Skill=37.1% | Modelo=lasso | HL=378 | thr=0.4 | topk=8
+
+=== 504d: TOP-5 por skill ===
+    model  half_life  freq_thr  topk      RMSE  RMSE_std       MAE   MAE_std        R2    R2_std  Baseline     Skill%
+9   lasso        252       0.4     8  0.243636  0.086093  0.211793  0.084447 -3.123545  1.881769  0.533165  54.303835
+10  lasso        252       0.4    12  0.243636  0.086093  0.211793  0.084447 -3.123545  1.881769  0.533165  54.303835
+11  lasso        252       0.4    18  0.243636  0.086093  0.211793  0.084447 -3.123545  1.881769  0.533165  54.303835
+18  lasso        378       0.4     8  0.255534  0.103530  0.223792  0.102369 -3.547128  2.304418  0.533165  52.072347
+19  lasso        378       0.4    12  0.255534  0.103530  0.223792  0.102369 -3.547128  2.304418  0.533165  52.072347
+
+=== Mejor config 504d ===
+{'model': 'lasso', 'half_life': 252, 'freq_thr': 0.4, 'topk': 8, 'RMSE': 0.24363616147520561, 'RMSE_std': 0.08609343759066089, 'MAE': 0.21179264123081826, 'MAE_std': 0.08444685223923085, 'R2': -3.1235451642442285, 'R2_std': 1.88176894189926, 'Baseline': 0.5331654461286063, 'Skill%': 54.303835095787974}
+
+=== 504d: Features usadas en el modelo final (11) ===
+0                 volume
+1               roc_1260
+2             dist_sma50
+3            dist_sma400
+4           from_52w_low
+5          drawdown_long
+6     vol_ratio_252_1260
+7         iv_atm_360_ext
+8     iv_ts_ratio_30_360
+9         news_mean_w126
+10         news_std_w126
+
+=== 504d: Coeficientes finales — TOP 12 ===
+                        coef
+iv_atm_360_ext      0.051011
+volume              0.007661
+iv_ts_ratio_30_360  0.004056
+news_std_w126      -0.005395
+dist_sma50         -0.009669
+news_mean_w126     -0.039972
+vol_ratio_252_1260 -0.043393
+dist_sma400        -0.075801
+from_52w_low       -0.087601
+roc_1260           -0.124641
+drawdown_long      -0.223332
+
+=== 504d: Coeficientes finales — BOTTOM 12 ===
+                        coef
+iv_atm_360_ext      0.051011
+volume              0.007661
+iv_ts_ratio_30_360  0.004056
+news_std_w126      -0.005395
+dist_sma50         -0.009669
+news_mean_w126     -0.039972
+vol_ratio_252_1260 -0.043393
+dist_sma400        -0.075801
+from_52w_low       -0.087601
+roc_1260           -0.124641
+drawdown_long      -0.223332
+
+=== Resumen 504d ===
+504d → RMSE=0.2436 (base 0.5332) | Skill=54.3% | Modelo=lasso | HL=252 | thr=0.4 | topk=8
