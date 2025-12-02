@@ -51,7 +51,7 @@ def _generar_explicacion_simple(texto_tecnico: str):
     REGLAS DE ORO:
     1. CERO NÚMEROS: Prohibido mencionar precios, porcentajes o fechas exactas.
     2. CERO TECNICISMOS: Nada de "momentum", "señal", "volatilidad".
-    3. LENGUAJE: Natural, cercano, de "tú a tú".
+    3. LENGUAJE: Natural, cercano pero bien escrito
 
     GUÍA DE CONSEJOS (TRANSMITE ESTAS IDEAS CON TUS PROPIAS PALABRAS):
 
