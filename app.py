@@ -205,6 +205,43 @@ def _compute_news_range(master_csv: str, fallback_days: int = 60):
 
 st.set_page_config(page_title="IA Trader", layout="centered")
 
+# --- BLOQUE DE SEGURIDAD ---
+def check_password():
+    """Devuelve True si la contraseña es correcta."""
+    
+    # 1. Definir la función de verificación
+    def password_entered():
+        # Compara la entrada del usuario con el secreto guardado
+        if st.session_state["password"] == st.secrets["PASSWORD"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Borrar del estado por seguridad
+        else:
+            st.session_state["password_correct"] = False
+
+    # 2. Si ya está validado, retornar True inmediatamente
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # 3. Mostrar input de contraseña si no está validado
+    st.title("🔒 Acceso Restringido")
+    st.markdown("Por favor, introduce la contraseña para acceder a **IA Trader**.")
+    
+    st.text_input(
+        "Contraseña", 
+        type="password", 
+        on_change=password_entered, 
+        key="password"
+    )
+    
+    # Mensaje de error si falla
+    if "password_correct" in st.session_state and not st.session_state["password_correct"]:
+        st.error("⛔ Contraseña incorrecta")
+
+    return False
+
+if not check_password():
+    st.stop()  # DETIENE LA APP AQUÍ si no hay login
+
 # --- CSS MEJORADO ---
 st.markdown("""<style>
 /* 1. Subir todo el contenido (reducir padding top) */
