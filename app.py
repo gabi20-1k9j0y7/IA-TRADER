@@ -14,7 +14,7 @@ fmt = lambda d: pd.to_datetime(d).strftime("%d-%m-%y") if pd.notna(pd.to_datetim
 
 def _limpiar_archivos_temporales(folder: str):
     import glob
-    # Patrones de archivos "basura" que queremos borrar
+    # Patrones de archivos temporales a eliminar
     patrones = [
         "guardian_*.csv",
         "nyt_*.csv",
@@ -23,7 +23,6 @@ def _limpiar_archivos_temporales(folder: str):
     
     count = 0
     for pat in patrones:
-        # Busca archivos que coincidan con el patrón en la carpeta
         files = glob.glob(os.path.join(folder, pat))
         for f in files:
             try:
@@ -78,7 +77,6 @@ def _generar_explicacion_simple(texto_tecnico: str):
     """
     
     try:
-        # Asegúrate de tener OPENAI_API_KEY configurada en tu entorno
         response = openai.chat.completions.create(
             model="gpt-4o", 
             messages=[
@@ -209,20 +207,17 @@ st.set_page_config(page_title="IA Trader", layout="centered")
 def check_password():
     """Devuelve True si la contraseña es correcta."""
     
-    # 1. Definir la función de verificación
     def password_entered():
-        # Compara la entrada del usuario con el secreto guardado
+        # Validación contra secrets
         if st.session_state["password"] == st.secrets["PASSWORD"]:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Borrar del estado por seguridad
+            del st.session_state["password"]  # Limpieza de sesión post-validación
         else:
             st.session_state["password_correct"] = False
 
-    # 2. Si ya está validado, retornar True inmediatamente
     if st.session_state.get("password_correct", False):
         return True
 
-    # 3. Mostrar input de contraseña si no está validado
     st.title("🔒 Acceso Restringido")
     st.markdown("Por favor, introduce la contraseña para acceder a **IA Trader**.")
     
@@ -233,18 +228,18 @@ def check_password():
         key="password"
     )
     
-    # Mensaje de error si falla
+
     if "password_correct" in st.session_state and not st.session_state["password_correct"]:
         st.error("⛔ Contraseña incorrecta")
 
     return False
 
 if not check_password():
-    st.stop()  # DETIENE LA APP AQUÍ si no hay login
-
+    st.stop()  # Bloqueo de ejecución si no hay autenticación
+    
 # --- CSS MEJORADO ---
 st.markdown("""<style>
-/* 1. Subir todo el contenido (reducir padding top) */
+/* Ajuste de contenedor principal */
 .block-container {
     max-width: 1000px !important;
     padding-top: 1rem !important;  /* Antes era 2rem */
@@ -253,7 +248,7 @@ st.markdown("""<style>
     padding-right: 5rem !important;
 }
 
-/* 2. Botones Primarios (Ejecutar y Reset) -> VERDES */
+/* Estilo botones primarios */
 button[kind="primary"] {
     background-color: #14532d !important;
     color: white !important;
@@ -264,7 +259,7 @@ button[kind="primary"]:hover {
     background-color: #166534 !important;
 }
 
-/* 3. Botón Secundario (Explicación) -> Transparente/Gris */
+/* Estilo botones secundarios */
 button[kind="secondary"] {
     background-color: transparent !important;
     color: #cbd5e1 !important;
@@ -299,18 +294,16 @@ if "result" not in st.session_state: st.session_state.result = {}
 if "simple_text" not in st.session_state: st.session_state.simple_text = None
 
 # --- TÍTULO CON BOTÓN DE INFO ---
-# --- TÍTULO CON BOTÓN DE INFO ---
-# Ajustamos columnas: 85% título, 15% botón para que tenga espacio
+# Layout cabecera
 col_title, col_info = st.columns([0.85, 0.15]) 
 
 with col_title:
     st.title("IA Trader")
 
 with col_info:
-    # Aumentamos a 45px para bajar el botón y alinearlo con el texto
+    # Espaciador para alineación vertical del botón
     st.markdown("<div style='height: 45px;'></div>", unsafe_allow_html=True)
     
-    # El botón popover con el texto largo
     with st.popover("ℹ️"):
         st.markdown("""
     ### 🤖 Bienvenido a IA Trader
@@ -364,7 +357,7 @@ with col3:
     run = st.button("Ejecutar", type="primary", use_container_width=True, disabled=boton_desactivado)
 
 
-# AÑADIDO type="primary" para que Reset también sea VERDE
+# AActivación de estilos primarios (verde)
 reset = st.button("Reset", type="primary")
 if reset:
     st.session_state.running = False
@@ -601,7 +594,6 @@ with zona_resultados.container():
         bg_color = "rgba(20, 83, 45, 0.2)" if is_simplified else "rgba(28, 131, 225, 0.1)"
         border_color = "rgba(20, 83, 45, 0.5)" if is_simplified else "rgba(28, 131, 225, 0.4)"
 
-        # Ajuste de párrafos: 4px de separación (o lo que quieras ajustar)
         texto_html = narrative_to_show.replace("\n", "<div style='height: 4px;'></div>")
 
         html_box = f"""
@@ -622,14 +614,13 @@ with zona_resultados.container():
 
         # --- BOTÓN DE SIMPLIFICAR ---
         if not is_simplified:
-            # MARGEN NEGATIVO: Esto es lo que sube el botón hacia arriba
+            # Ajuste de margen superior para alineación
             st.markdown("<div style='margin-top: -20px;'></div>", unsafe_allow_html=True)
 
             col_spacer, col_btn = st.columns([3, 1])
             with col_btn:
                 btn_placeholder = st.empty()
                 
-                # Botón VERDE (primary)
                 clicked = btn_placeholder.button("🧠 Explicación sencilla", type="primary", use_container_width=True)
                 
                 if clicked:
