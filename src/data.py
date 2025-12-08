@@ -1,19 +1,10 @@
-# src/data.py — Etapas 1 y 2
-# ============================================================
-# Etapa 1 (técnicos): append-only, 28 columnas
-# Etapa 2 (opciones): lee 8 CSVs en la carpeta del maestro y
-#   - RELLENA SOLO el "hueco de cola" (tail) de cada columna
-#   - NO pisa celdas con valor
-#   - Normaliza HV/IV a decimales (0–1) si vienen en %
-#   - Calcula derivadas SOLO donde falten:
-#       * iv_ts_ratio_30_360 = iv_atm_30_ext / iv_atm_360_ext
-#       * iv_minus_hv30      = iv_atm_30_ext - hv_yz_30_ext
-# ============================================================
+# src/data.py
+# Procesamiento de datos: Indicadores técnicos (Etapa 1) y Opciones Financieras (Etapa 2).
 
 from __future__ import annotations
 import os, typing as t, warnings
 
-# Silenciar aviso de pkg_resources ANTES de importar pandas_ta
+# Gestión de warnings de librerías externas
 warnings.filterwarnings("ignore", message=r".*pkg_resources is deprecated as an API.*")
 
 import numpy as np
@@ -38,9 +29,9 @@ def _get_secret(name: str, default: str | None = None) -> str | None:
 
 ALPHAVANTAGE_API_KEY = _get_secret("ALPHAVANTAGE_API_KEY", None)
 
-# Ventanas y colchón para ventanas largas (1260 ≈ 5 años)
+# Configuración de ventanas temporales
 WINDOW_MAX = 1260
-PAD_BDAYS  = 90   # colchón extra para festivos
+PAD_BDAYS  = 90   
 
 # ============================
 # Utilidades comunes
@@ -95,7 +86,7 @@ def _bb_width_from_df(bbands_df: pd.DataFrame) -> pd.Series:
 
 
 def _apply_manual_splits(df: pd.DataFrame, splits: list[tuple[str, float]]) -> pd.DataFrame:
-    """Aplica factores de split solo a filas ANTERIORES a cada fecha."""
+    """Ajuste retroactivo de precios por splits."""
     if not splits: return df
     df = df.copy(); df["adj_factor"] = 1.0
     for date_str, factor in sorted(splits, key=lambda x: pd.to_datetime(x[0])):
@@ -139,32 +130,26 @@ def fetch_prices_incremental(ticker: str, cache_file: str, years_hist: int = 10)
         last_dt = cache.index.max()
         today = pd.Timestamp.today().normalize()
         
-        # 1. Regla base: Si mi último dato es anterior a hoy, en teoría necesito actualizar
+        # Verificación de datos obsoletos
         if last_dt < today:
-            # 2. Excepción 'Intradía/Festivo':
-            # Si tengo el dato de ayer (diferencia pequeña)
-            # Y la hora actual es antes de las 23:00 (cierre aproximado),
-            # asumimos que la API aún no tiene el dato de 'hoy' y evitamos la llamada.
+            # Lógica de exclusión intradía/festivo
             diff_days = (today - last_dt).days
             current_hour = pd.Timestamp.now().hour
             
-            # Si solo falta 1-3 días (fin de semana o festivo reciente) y es temprano
+            # Evitar llamadas innecesarias a API en horario de mercado abierto
             if diff_days <= 3 and current_hour < 23:
                 need_update = False
             else:
                 need_update = True
         else:
-            # Mi caché ya tiene fecha de hoy (o futuro), no actualizar
             need_update = False
 
     if cache.empty:
-        # Construcción inicial
         merged = _av_get_daily(ticker, "full")
         if ticker.upper() == "AMZN" and (merged.index < "2022-06-06").any():
             merged = _apply_manual_splits(merged, [("2022-06-06", 20)])
             
     elif need_update:
-        # Solo ajustar el bloque nuevo
         fresh = _av_get_daily(ticker, "compact")
         if ticker.upper() == "AMZN" and (fresh.index < "2022-06-06").any():
             fresh = _apply_manual_splits(fresh, [("2022-06-06", 20)])
@@ -184,7 +169,7 @@ def fetch_prices_incremental(ticker: str, cache_file: str, years_hist: int = 10)
 # ============================
 
 def _parse_dates_flex(series: pd.Series) -> pd.Series:
-    """1) %d-%m-%y, 2) %d/%m/%y, 3) ISO %Y-%m-%d, 4) fallback genérico (dayfirst=True)."""
+    """Parseo flexible de fechas (múltiples formatos soportados)"""
     s = pd.to_datetime(series, format="%d-%m-%y", errors="coerce")
     m = s.isna()
     if m.any():
@@ -209,9 +194,9 @@ def _read_master_anydate(path: str) -> pd.DataFrame:
     df.index.name = "Date"
     return df
 
-# ============================
-# Etapa 1 — Técnicos (28 columnas exactas)
-# ============================
+# ====================
+# Etapa 1 — Técnicos
+# ====================
 
 def build_technical_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     feats = ohlcv.copy(); feats.index.name = "Date"
@@ -221,7 +206,7 @@ def build_technical_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     high  = feats["high"].astype(float)
     low   = feats["low"].astype(float)
     opn   = feats["open"].astype(float)
-    vol   = feats["volume"].astype("float64")  # asegurar float64
+    vol   = feats["volume"].astype("float64")  
 
     feats["logret_1"]      = np.log(close / close.shift(1))
     feats["overnight_ret"] = np.log(opn / close.shift(1))
@@ -234,11 +219,10 @@ def build_technical_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     atr14 = ta.atr(high, low, close, length=14)
     feats["atr_14_pct"] = (atr14 / close) * 100.0
 
-    # ---- vol_z_21 (ventana 21, ddof=1) con NumPy en rolling ----
+    # Cálculo optimizado de volatilidad (Z-Score)
     vol_mu  = vol.rolling(21, min_periods=21).apply(lambda x: np.mean(x), raw=True)
     vol_sig = vol.rolling(21, min_periods=21).apply(lambda x: np.std(x, ddof=1), raw=True).replace(0, np.nan)
     feats["vol_z_21"] = (vol - vol_mu) / vol_sig
-    # ------------------------------------------------------------
 
     sma20  = ta.sma(close, length=20)
     sma50  = ta.sma(close, length=50)
@@ -282,7 +266,7 @@ def build_technical_indicators(ohlcv: pd.DataFrame) -> pd.DataFrame:
     return feats[TECH_COLS].copy()
 
 # ============================
-# Etapa 1 — Actualización maestro (append-only)
+# Etapa 1 — Actualización maestro 
 # ============================
 
 def update_master_technicals(
@@ -374,13 +358,13 @@ def update_master_options_from_csvs(
     abs_master = os.path.abspath(master_csv_path)
     master_dir = os.path.dirname(master_csv_path) or "."
 
-    # 1) Cargar maestro
+    # Carga de dataset principal
     _p(5, "Leyendo maestro…")
     master = _read_master_anydate(master_csv_path)
     if master.empty:
         return {"updated_cells": 0, "derived_cells": 0, "reason": "master_empty", "master_path_abs": abs_master}
 
-    # 2) Mapeo archivo -> (columna maestro, clave para escala)
+    # Configuración de mapeo CSV externo -> Columnas
     T = ticker.upper()
     files_map: dict[str, tuple[str, str]] = {
         f"{T}_hv_yz_30.csv":    ("hv_yz_30_ext",    "hv_yz_30"),
@@ -393,12 +377,11 @@ def update_master_options_from_csvs(
         f"{T}_pcr_v_30.csv":    ("pc_ratio_vol_30_ext", "pcr_vol_30"),
     }
 
-    # Garantizar columnas en maestro
     for col, _ in files_map.values():
         if col not in master.columns:
             master[col] = np.nan
 
-    # Auxiliares de lectura/escala
+    # Helpers de procesamiento local
     def _parse_dates_flex_series(df: pd.DataFrame, col: str) -> pd.Series:
         s = pd.to_datetime(df[col], format="%d-%m-%y", errors="coerce")
         m = s.isna()
@@ -436,7 +419,7 @@ def update_master_options_from_csvs(
                 if v.median() > 1.5 or v.max() > 3: return s / 100.0
         return s
 
-    # 3) Tail fill columna a columna
+    # Relleno incremental de datos (Tail Fill)
     _p(25, "Leyendo CSVs y alineando…")
     found_csvs, missing_csvs, scaled_cols = [], [], []
     updated_cols: list[str] = []
@@ -482,9 +465,8 @@ def update_master_options_from_csvs(
         except Exception:
             found_csvs.append(fname)
 
-    # --- NUEVO BLOQUE: FORWARD FILL ---
-    # Si faltan datos en los últimos días (porque no se subieron CSVs),
-    # copiamos el valor del día anterior.
+    # Forward Fill
+
     _p(75, "Rellenando huecos de opciones (Forward Fill)...")
     cols_to_fill = [c for c, _ in files_map.values()]
     cols_present = [c for c in cols_to_fill if c in master.columns]
@@ -493,11 +475,10 @@ def update_master_options_from_csvs(
         master[cols_present] = master[cols_present].ffill()
     # ----------------------------------
 
-    # 4) Derivadas SOLO en fechas tocadas y SOLO si están NaN
+    # 4) Cálculo de métricas derivadas
     _p(80, "Calculando derivadas (solo donde falte)…")
     derived_cells = 0
     
-    # Si se hizo ffill en las últimas filas, necesitamos calcular derivadas para ellas también
     if updated_cells == 0:
         touched_dates.update(master.index[-5:]) # Revisar últimos 5 días por si acaso
 
@@ -521,7 +502,7 @@ def update_master_options_from_csvs(
                     master.at[d, "iv_minus_hv30"] = float(a) - float(c)
                     derived_cells += 1
 
-    # 5) Guardar si hubo cambios
+    # 5) Persistencia de datos
     if write_back:
         _p(95, "Guardando maestro…")
         _safe_write_csv(master, master_csv_path, index_label="Date")
