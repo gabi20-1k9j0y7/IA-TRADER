@@ -20,7 +20,7 @@ def progress(pct: int, msg: str):
 
 def get_api_key():
     try:
-        import streamlit as st  # type: ignore
+        import streamlit as st  
         secrets = dict(st.secrets) if hasattr(st, "secrets") else {}
     except Exception:
         secrets = {}
