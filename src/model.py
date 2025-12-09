@@ -1,5 +1,5 @@
 # src/model.py
-# Inferencia + Narrativa GPT-4o con Lógica de Negocio Validada
+# Inferencia + Narrativa GPT-4o
 
 import os
 import sys
@@ -11,10 +11,6 @@ import pandas as pd
 import joblib
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
-
-# ==========================================
-# 1. CONFIGURACIÓN
-# ==========================================
 
 # Rutas Base
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,17 +36,13 @@ HORIZONTE_TEXTO = {
     "2y": "los próximos dos años"
 }
 
-# Intentar importar SHAP
+# Importar SHAP
 try:
     import shap
     USAR_SHAP = True
 except ImportError:
     shap = None
     USAR_SHAP = False
-
-# ==========================================
-# 2. FUNCIONES DE UTILERÍA Y LIMPIEZA
-# ==========================================
 
 def _to_native(obj):
     """Convierte tipos de NumPy a nativos de Python para JSON serializable."""
@@ -92,7 +84,7 @@ def _read_maestro_with_stats(path: Path) -> Tuple[pd.Series, pd.Series, str]:
     # Medias estadísticas sobre todo el histórico
     stats_mean = df.select_dtypes(include=[np.number]).mean()
     
-    # Última fila para predecir (usamos iloc[-1] para obtener una Series)
+    # Última fila para predecir
     last_row = df.iloc[-1]
     
     # Fecha formateada
@@ -188,9 +180,6 @@ def _limpiar_nombre_tecnico_natural(fname: str) -> str:
     
     return fname.replace("_", " ")
 
-# ==========================================
-# 3. LÓGICA DE NEGOCIO (Contexto y Drivers)
-# ==========================================
 
 def _get_market_context(row_series, stats_mean):
     """Extrae contexto de mercado (Precio, Volumen, Sentimiento, Opciones)."""
@@ -206,17 +195,16 @@ def _get_market_context(row_series, stats_mean):
                 return float(val), str(col)
         return None, None
 
-    # 1. Precio
+    # Precio
     price_val, _ = find_val("close")
     if price_val is not None:
         ctx["precio"] = price_val
 
-    # 2. Volumen
+    # Volumen
     vol_val, vol_col = find_val("volume", "ratio")
     if vol_val is not None:
         avg = float(stats_mean.get(vol_col, vol_val))
         
-        # Lógica para Millones
         vol_m = vol_val / 1_000_000
         avg_m = avg / 1_000_000
         ctx["volumen_dato"] = f"{vol_m:.2f} Millones (Media Histórica: {avg_m:.2f} Millones)"
@@ -224,7 +212,7 @@ def _get_market_context(row_series, stats_mean):
         diff_pct = ((vol_val - avg) / avg) * 100 if avg != 0 else 0
         ctx["volumen_estado"] = "superior" if diff_pct > 0 else "inferior"
 
-    # 3. Sentimiento
+    # Sentimiento de las noticias
     news_val, news_col = find_val("news_sent")
     if news_val is None: news_val, news_col = find_val("news_mean")
     
@@ -235,7 +223,7 @@ def _get_market_context(row_series, stats_mean):
         elif news_val < 5: ctx["sentimiento"] = "optimista"
         else: ctx["sentimiento"] = "muy optimista"
 
-    # 4. Opciones
+    # Mercado de opciones
     iv_val, iv_col = find_val("iv_atm_30")
     if iv_val is not None:
         avg = float(stats_mean.get(iv_col, iv_val))
@@ -276,7 +264,6 @@ def _get_shap_drivers(model, X_input, feats_list, stats_mean, pred_pct, horizon_
                 else: estado_relativo = "alto" if raw_val > mean_val else "bajo"
             
             elif "drawdown" in fname.lower():
-                # Script validado: raw < mean -> alto (peor)
                 if raw_val < mean_val: estado_relativo = "alto"
                 else: estado_relativo = "bajo"
             
@@ -288,7 +275,6 @@ def _get_shap_drivers(model, X_input, feats_list, stats_mean, pred_pct, horizon_
                     clean_name = "estar por debajo de la media móvil de 200 sesiones"
                     estado_relativo = "BINARIO_NEGATIVO" 
 
-            # RESTAURADO: Evitar comparación con media para el precio
             elif "close" in fname.lower() and "dist" not in fname.lower():
                 estado_relativo = "actual"
 
@@ -323,7 +309,7 @@ def _get_shap_drivers(model, X_input, feats_list, stats_mean, pred_pct, horizon_
         if abs(pred_pct) > threshold:
             selected = drivers_favor[:2]
         else:
-            # Si hay poca predicción, mostramos fuerzas opuestas
+            # Si hay poca direccionalidad muestra fuerzas opuestas
             top_bull = next((d for d in all_drivers if d['senal'] == 'alcista'), None)
             top_bear = next((d for d in all_drivers if d['senal'] == 'bajista'), None)
             if top_bull: selected.append(top_bull)
@@ -334,9 +320,7 @@ def _get_shap_drivers(model, X_input, feats_list, stats_mean, pred_pct, horizon_
     except Exception:
         return []
 
-# ==========================================
-# 4. GENERACIÓN DE PROMPTS
-# ==========================================
+# PROMPTS
 
 def _generate_prompts(hkey: str, payload: dict) -> Tuple[str, str]:
     """Genera los prompts validados para el modelo LLM."""
@@ -417,10 +401,8 @@ def _generate_prompts(hkey: str, payload: dict) -> Tuple[str, str]:
 
     return system_prompt, user_prompt
 
-# ==========================================
-# 5. FUNCIÓN PRINCIPAL (API)
-# ==========================================
 
+# Función principal
 def run_inference(
     hkey: str,
     maestro_path: str, # Puede ser str o Path
@@ -434,35 +416,33 @@ def run_inference(
 
     path_obj = Path(maestro_path)
     
-    # 1. Cargar Datos y Estadísticas
-    # 'row_series' es ahora una Series de pandas (una fila), lo que es correcto.
+    # Cargar Datos y Estadísticas
     row_series, stats_mean, fecha_str = _read_maestro_with_stats(path_obj)
     
-    # 2. Cargar Modelo
+    # Cargar Modelo
     model_path = FILEMAP[hkey]
     if not model_path.exists():
         raise FileNotFoundError(f"Modelo no encontrado: {model_path}")
     
     model = joblib.load(model_path)
     
-    # 3. Preparar Input del Modelo
+    # Preparar Input del Modelo
     # Como row_series es una Series, .to_frame().T funciona correctamente para crear un DataFrame de una fila (1, n_features)
     feats_list, X_input = _align_features(model, row_series.to_frame().T)
 
-    # 4. Inferencia Numérica
+    # Inferencia Numérica
     yhat_log = float(model.predict(X_input)[0])
     pred_pct = (math.exp(yhat_log) - 1.0) * 100.0
     
-    # 5. Contexto y Drivers
-    # row_series (Series) es iterable por su índice (nombres de columna), así que _get_market_context funcionará.
+    # Contexto y Drivers
     contexto = _get_market_context(row_series, stats_mean)
     
-    # Solo calculamos drivers si NO es 1d (según lógica validada, 1d es Random Walk)
+    # Calculo de drivers excepto para un horizonte de 1 día
     drivers = []
     if hkey != "1d":
         drivers = _get_shap_drivers(model, X_input, feats_list, stats_mean, pred_pct, hkey)
 
-    # 6. Preparar Payload LLM
+    # Preparar Payload LLM
     decimales = 3 if hkey == "1d" else 2
     
     payload = {
@@ -475,7 +455,7 @@ def run_inference(
         "factores_clave": drivers
     }
 
-    # 7. Llamada a OpenAI
+    # Llamada a OpenAI
     narrative = None
     llm_diag = {"used": False}
 
@@ -506,12 +486,12 @@ def run_inference(
              llm_diag["error"] = "No API Key found"
 
  
-# 8. Retorno Estructurado
+# Retorno Estructurado
     return {
         "date": fecha_str,
         "horizon_days": hkey, 
-        "pred_pct": pred_pct,        # Valor crudo (con todos los decimales)
-        "ui_pct": round(pred_pct, decimales), # <--- AÑADIDO: Valor redondeado igual que el texto
+        "pred_pct": pred_pct,        
+        "ui_pct": round(pred_pct, decimales), 
         "narrative": narrative,
         "llm_used": llm_diag["used"],
         "llm_diag": llm_diag,
