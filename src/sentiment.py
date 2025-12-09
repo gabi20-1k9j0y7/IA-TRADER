@@ -2,15 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 sentiment.py — Relevancia → Puntuación (solo relevantes) → Media diaria
-- La media diaria cubre desde el inicio del intervalo de noticias HASTA HOY.
-- Si faltan días en medio, se rellenan con 0.
-- Salidas:
-  1) "<input_stem> - con Relevante.csv"
-  2) "<input_stem> - puntuado.csv"                 (SOLO relevantes)
-  3) "<input_stem> - puntuado - diario_media.csv"  (exacto: Fecha, Media_Puntuacion; rango completo hasta hoy)
-
-Requisitos: pip install openai pandas
-Lee la API key de OPENAI_API_KEY (env o st.secrets).
 """
 import os, re, json, time, hashlib, sys, argparse
 from pathlib import Path
@@ -23,7 +14,7 @@ def _get_openai_client(explicit_key: Optional[str] = None):
     key = explicit_key
     if not key:
         try:
-            import streamlit as st  # type: ignore
+            import streamlit as st  
             if hasattr(st, "secrets"):
                 key = st.secrets.get("OPENAI_API_KEY") or st.secrets.get("openai_api_key")
         except Exception:
@@ -31,7 +22,7 @@ def _get_openai_client(explicit_key: Optional[str] = None):
     key = key or os.getenv("OPENAI_API_KEY") or os.getenv("openai_api_key")
     if not key:
         raise RuntimeError("Falta OPENAI_API_KEY (en st.secrets o variable de entorno).")
-    from openai import OpenAI  # lazy import
+    from openai import OpenAI  
     return OpenAI(api_key=key)
 
 # ======= Config y prompts =======
@@ -218,7 +209,6 @@ def score_news(in_csv: Path, out_csv: Path, api_key: Optional[str] = None,
         col_resumen = "Resumen"
 
     if df.shape[0] == 0:
-        # CSV vacío pero con cabeceras
         cols = list(df_all.columns)
         if "Puntuacion" not in cols:
             cols.append("Puntuacion")
@@ -259,21 +249,18 @@ def score_news(in_csv: Path, out_csv: Path, api_key: Optional[str] = None,
     _progress(on_progress, 90, f"Puntuación lista (relevantes={n}).")
     return {"out_csv": str(out_csv)}
 
-# ======= Paso 3: media diaria (rango completo hasta HOY; 2 columnas) =======
+# ======= Paso 3: media diaria =======
 def daily_mean(in_scored_csv: Path, out_daily_csv: Path,
                on_progress: Optional[Callable[[int,str], None]] = None) -> Dict[str, Any]:
     df = read_csv_any(in_scored_csv).copy()
 
-    # Columnas esperadas
     col_fecha = "Fecha" if "Fecha" in df.columns else df.columns[0]
     if "Puntuacion" not in df.columns:
-        # Sin puntuadas → diario vacío
         out = pd.DataFrame(columns=["Fecha", "Media_Puntuacion"])
         out.to_csv(out_daily_csv, index=False, encoding="utf-8-sig")
         if on_progress: on_progress(100, "Media diaria lista: 0 días con noticia.")
         return {"daily_mean_csv": str(out_daily_csv), "rows": 0}
 
-    # Parse de fecha MUY robusto (primero yearfirst, luego dayfirst si hiciera falta)
     dt = pd.to_datetime(df[col_fecha], errors="coerce", yearfirst=True)
     if dt.notna().sum() == 0:
         dt = pd.to_datetime(df[col_fecha], errors="coerce", dayfirst=True)
@@ -281,11 +268,11 @@ def daily_mean(in_scored_csv: Path, out_daily_csv: Path,
     pts  = pd.to_numeric(df["Puntuacion"], errors="coerce")
     mask = dt.notna() & pts.notna()
 
-    # SOLO días con noticia (nada de reindex ni ceros)
+    # SOLO días con noticia 
     s = pts[mask].groupby(dt[mask].dt.normalize()).mean().sort_index()
 
     out = pd.DataFrame({
-        "Fecha": s.index.strftime("%Y-%m-%d"),    # ISO para no liar day/month
+        "Fecha": s.index.strftime("%Y-%m-%d"),    
         "Media_Puntuacion": s.round(3).values
     })
     out.to_csv(out_daily_csv, index=False, encoding="utf-8-sig")
@@ -327,11 +314,10 @@ def update_master_with_daily_sentiment(master_csv_path: str,
         _cb(100, "No hay datos en el diario_media; maestro sin cambios.")
         return {"updated_rows": 0, "missing_to_zero": 0, "last_sent_before": None, "last_sent_after": None}
 
-    # --- INICIO DE LA LÓGICA CORREGIDA ---
 
     col_news = "news_sent_mean"
     if col_news not in master_txt.columns:
-        master_txt[col_news] = "" # pd.to_numeric lo convertirá en NaN
+        master_txt[col_news] = "" 
 
     # 1. Empezar con la columna existente de puntuaciones
     final_col = pd.to_numeric(master_txt[col_news], errors="coerce")
@@ -353,7 +339,6 @@ def update_master_with_daily_sentiment(master_csv_path: str,
     start_write_zeros = None
     
     if mask_is_still_na.any():
-        # .idxmax() encuentra el índice de la primera fila True (o sea, el primer NaN)
         first_nan_index = mask_is_still_na.idxmax()
         start_write_zeros = date_master.loc[first_nan_index]
 
@@ -366,23 +351,15 @@ def update_master_with_daily_sentiment(master_csv_path: str,
         # El rango de relleno va desde el primer hueco que encontramos hasta hoy
         mask_zero_fill_range = date_master.notna() & (date_master >= start_write_zeros) & (date_master <= today)
         
-        # Rellenamos CON CERO si:
-        # - Está en el rango de relleno (desde el primer hueco hasta hoy)
-        # - NO vino un dato nuevo del 'diario_media' (porque si no, ya se habría escrito)
-        # - Y (por seguridad) sigue estando vacío
         mask_needs_zero = mask_zero_fill_range & map_new_scores.isna() & final_col.isna()
 
-    # 7. Rellenar solo esas filas con 0.0 (Regla 3: no toca datos antiguos)
     final_col.loc[mask_needs_zero] = 0.0
 
-    # 8. Asignar la columna final actualizada al dataframe
     master_txt[col_news] = final_col
 
-    # --- FIN DE LA LÓGICA CORREGIDA ---
 
     _cb(70, "Calculando derivadas (w3, w21, w63, w126)…")
     s_full = pd.to_numeric(master_txt[col_news], errors="coerce")
-    # min_periods=1 → no deja huecos dentro del tramo
     for w in (3, 21, 63, 126):
         master_txt[f"news_mean_w{w}"] = s_full.rolling(window=w, min_periods=1).mean()
         master_txt[f"news_std_w{w}"]  = s_full.rolling(window=w, min_periods=1).std(ddof=0)
@@ -413,8 +390,8 @@ def classify_and_score_unified_news(unified_csv_path: str, ticker: str = "AMZN",
     daily_csv  = out_dir / f"{stem} - puntuado - diario_media.csv"
 
     r1 = mark_relevance(p, relev_csv, api_key=api_key, on_progress=on_progress)
-    r2 = score_news(relev_csv, scored_csv, api_key=api_key, on_progress=on_progress)   # SOLO relevantes
-    r3 = daily_mean(scored_csv, daily_csv, on_progress=on_progress)                    # Rango completo hasta HOY
+    r2 = score_news(relev_csv, scored_csv, api_key=api_key, on_progress=on_progress)   
+    r3 = daily_mean(scored_csv, daily_csv, on_progress=on_progress)                   
 
     return {
         "relevant_csv": str(relev_csv),
